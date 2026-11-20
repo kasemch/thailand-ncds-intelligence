@@ -38,7 +38,8 @@ addition=r'''
 }
 @media (max-width:400px) {
   #quality .ncd-accessible-scroll {overflow-x:auto!important;overflow-y:hidden!important;contain:layout paint inline-size;inline-size:100%!important;max-inline-size:100%!important;}
-  #quality .ncd-accessible-scroll > table {min-width:350px!important;max-width:none!important;width:max-content!important;}
+  #quality .ncd-accessible-scroll > table {min-width:0!important;max-width:100%!important;width:100%!important;table-layout:fixed!important;}
+  #quality .ncd-accessible-scroll th, #quality .ncd-accessible-scroll td {white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;}
 }
 </style>
 <script id="ncd-v32-region-init">

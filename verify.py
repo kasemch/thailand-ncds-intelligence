@@ -51,16 +51,16 @@ def run(browser, width, height, receipt):
                    yLabels:[...e.querySelectorAll('.ytick text')].map(t=>t.textContent)
                  }))};
             }""")
-            assert metrics["viewport"] == [width, height], "Viewport changed during the run"
+            metrics["viewport_match"] = metrics["viewport"] == [width, height]
             path = OUTPUT / f"{width}x{height}-{name}.png"
-            page.screenshot(path=path, scale="css")
+            page.screenshot(path=path, scale="css", full_page=True)
             receipt["panels"].append({"name": name, "image": path.name, **metrics})
         page.locator("#tab-overview").click()
         receipt["return"] = overview(page, "Viet Nam", "2000", "20.10%")
         page.reload(wait_until="domcontentloaded")
         receipt["reload"] = overview(page, "Thailand", "2021", "14.50%")
         receipt["status"] = "FAIL_OVERFLOW" if any(
-            metric["overflow"] for p in receipt["panels"]
+            (metric["overflow"] or not p["viewport_match"]) for p in receipt["panels"]
             for metric in [p["document"], p["panel"], *p["charts"]]
         ) else "PASS_AUTOMATED_CHECKS"
     finally:

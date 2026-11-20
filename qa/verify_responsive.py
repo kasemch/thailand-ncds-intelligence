@@ -7,6 +7,9 @@ OUTPUT.mkdir(exist_ok=True)
 URL=os.environ.get("NCD_TEST_URL","http://127.0.0.1:8765/")
 RECEIPT={"url":URL,"production":"HOLD","native_ipad_safari":"NOT CERTIFIED","runs":[]}
 error_count=0
+# Allow up to 2 CSS pixels of scrollWidth/clientWidth rounding from chart borders.
+# Geometric overflow beyond the panel and document overflow remain zero-tolerance.
+BORDER_ROUNDING_TOLERANCE_PX=2
 
 with sync_playwright() as p:
     browser=p.chromium.launch()
@@ -44,9 +47,9 @@ with sync_playwright() as p:
                 page.screenshot(path=str(OUTPUT/image),full_page=True,scale="css")
                 measured["image"]=image
                 entry["panels"].append({"name":panel_name,**measured})
-                bad=measured["document"]["overflow"] or measured["panel"]["overflow"] or any(c["overflow"] or c["beyondPanel"] for c in measured["charts"])
+                bad=measured["document"]["overflow"] or measured["panel"]["overflow"]>BORDER_ROUNDING_TOLERANCE_PX or any(c["overflow"]>BORDER_ROUNDING_TOLERANCE_PX or c["beyondPanel"] for c in measured["charts"])
                 if bad: error_count+=1
-            entry["status"]="PASS" if all(x["document"]["overflow"]==0 and x["panel"]["overflow"]==0 and not any(c["overflow"] or c["beyondPanel"] for c in x["charts"]) for x in entry["panels"]) else "FAIL"
+            entry["status"]="PASS" if all(x["document"]["overflow"]==0 and x["panel"]["overflow"]<=BORDER_ROUNDING_TOLERANCE_PX and not any(c["overflow"]>BORDER_ROUNDING_TOLERANCE_PX or c["beyondPanel"] for c in x["charts"]) for x in entry["panels"]) else "FAIL"
         except Exception as exc:
             error_count+=1
             entry["status"]="ERROR"

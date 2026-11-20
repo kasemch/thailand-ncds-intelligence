@@ -48,7 +48,7 @@ for engine in ("chromium","webkit"):
           record["panels"].append({"name":name,"incomplete":incomplete,"tab_order_candidates":tabseq})
         # CSS half-viewport is a reflow STRESS TEST only; it is not 200% Safari zoom.
         # Captures computed scroll overflow and screenshots, preserves current working source.
-        context.set_viewport_size({"width":max(180,w//2),"height":max(190,h//2)})
+        page.set_viewport_size({"width":max(180,w//2),"height":max(190,h//2)})
         page.wait_for_timeout(500)
         for name in ("overview","explorer","quality"):
           page.locator("#tab-"+name).click()

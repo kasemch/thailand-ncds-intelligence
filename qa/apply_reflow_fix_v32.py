@@ -34,11 +34,11 @@ addition=r'''
   #explorer .ncd-accessible-scroll > .js-plotly-plot .plot-container {
     min-width:365px!important;max-width:none!important;
   }
-  #quality .ncd-accessible-scroll > table {
-    min-width:350px!important;max-width:none!important;
-    width:max-content!important;
-  }
-  #explorer, #quality {min-width:0;max-width:100%}
+    #explorer, #quality {min-width:0;max-width:100%}
+}
+@media (max-width:400px) {
+  #quality .ncd-accessible-scroll {overflow-x:auto!important;overflow-y:hidden!important;contain:layout inline-size;inline-size:100%!important;max-inline-size:100%!important;}
+  #quality .ncd-accessible-scroll > table {min-width:350px!important;max-width:none!important;width:max-content!important;}
 }
 </style>
 <script id="ncd-v32-region-init">

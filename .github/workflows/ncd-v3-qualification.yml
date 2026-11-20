@@ -1,0 +1,50 @@
+name: NCD v3 Safari surrogate and accessibility qualification
+on:
+  push:
+    branches: [fix/ncd-mobile-responsive-20261120]
+    paths:
+      - 'qa/qualify_accessibility_v3.py'
+      - '.github/workflows/ncd-v3-qualification.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout fix branch only
+        uses: actions/checkout@v4
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Chromium and Linux WebKit
+        run: |
+          python -m pip install 'playwright==1.58.0'
+          python -m playwright install --with-deps chromium webkit
+      - name: Install pinned axe-core
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund axe-core@4.10.3
+      - name: Launch local-only server
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/ncd-v3-http.log 2>&1 &
+          sleep 2
+          curl --fail --silent --show-error http://127.0.0.1:8765/ >/dev/null
+      - name: Test responsive, touch, keyboard, modebar and WCAG
+        id: qa
+        continue-on-error: true
+        run: python qa/qualify_accessibility_v3.py
+      - name: Upload raw evidence and 12 screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ncd-v3-accessibility-and-webkit-evidence
+          path: qa-v3-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Enforce automated acceptance
+        if: steps.qa.outcome != 'success'
+        run: |
+          echo 'AUTOMATED_HOLD: See evidence artifact, no production action.'
+          exit 1

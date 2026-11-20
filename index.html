@@ -1,5 +1,69 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Thailand NCDs Intelligence | ASEAN-11</title><style>
-:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#17253a;background:#f4f7fb}*{box-sizing:border-box}body{margin:0}header{background:#112744;color:white;padding:18px max(16px,calc((100vw - 1120px)/2))}h1{font-size:1.55rem;margin:0 0 6px}h2{font-size:1.15rem}p{line-height:1.5}.sub{color:#cbd5e1;font-size:.85rem}.wrap{max-width:1120px;margin:auto;padding:16px}.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:end;background:white;border:1px solid #dce4ef;padding:14px;border-radius:12px}label{display:block;font-weight:650;font-size:.87rem;margin-bottom:5px}select,button{font:inherit;border-radius:7px;padding:9px;border:1px solid #a9b6c8;background:white;color:#112744}select:focus-visible,button:focus-visible{outline:3px solid #1676db;outline-offset:2px}button{cursor:pointer}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}.tabs button[aria-selected="true"]{background:#173c66;color:white}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px}.card{background:white;border:1px solid #dce4ef;border-radius:10px;padding:16px}.metric{font-size:1.55rem;font-weight:750;margin:5px 0}.caption{font-size:.78rem;color:#526277}.plot{background:white;border:1px solid #dce4ef;border-radius:10px;margin:12px 0;min-height:350px}.notice{border-left:4px solid #a97821;background:#fff8e8;padding:12px;margin:14px 0}.panel[hidden]{display:none}.sr-only{position:absolute;left:-10000px}.footer{color:#46566b;font-size:.85rem;margin:24px 0}table{border-collapse:collapse;width:100%;background:white}th,td{padding:10px;text-align:left;border-bottom:1px solid #dce4ef}td:last-child{text-align:right}th{background:#eaf0f7} @media(max-width:600px){.wrap{padding:10px}h1{font-size:1.25rem}.plot{min-height:300px}}</style></head><body>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#17253a;background:#f4f7fb}*{box-sizing:border-box}body{margin:0}header{background:#112744;color:white;padding:18px max(16px,calc((100vw - 1120px)/2))}h1{font-size:1.55rem;margin:0 0 6px}h2{font-size:1.15rem}p{line-height:1.5}.sub{color:#cbd5e1;font-size:.85rem}.wrap{max-width:1120px;margin:auto;padding:16px}.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:end;background:white;border:1px solid #dce4ef;padding:14px;border-radius:12px}label{display:block;font-weight:650;font-size:.87rem;margin-bottom:5px}select,button{font:inherit;border-radius:7px;padding:9px;border:1px solid #a9b6c8;background:white;color:#112744}select:focus-visible,button:focus-visible{outline:3px solid #1676db;outline-offset:2px}button{cursor:pointer}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}.tabs button[aria-selected="true"]{background:#173c66;color:white}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px}.card{background:white;border:1px solid #dce4ef;border-radius:10px;padding:16px}.metric{font-size:1.55rem;font-weight:750;margin:5px 0}.caption{font-size:.78rem;color:#526277}.plot{background:white;border:1px solid #dce4ef;border-radius:10px;margin:12px 0;min-height:350px}.notice{border-left:4px solid #a97821;background:#fff8e8;padding:12px;margin:14px 0}.panel[hidden]{display:none}.sr-only{position:absolute;left:-10000px}.footer{color:#46566b;font-size:.85rem;margin:24px 0}table{border-collapse:collapse;width:100%;background:white}th,td{padding:10px;text-align:left;border-bottom:1px solid #dce4ef}td:last-child{text-align:right}th{background:#eaf0f7} @media(max-width:600px){.wrap{padding:10px}h1{font-size:1.25rem}.plot{min-height:300px}}</style>
+<!-- ncd-responsive-fix-v1 -->
+<style id="ncd-responsive-fix-v1">
+html, body {max-width:100%; overflow-x:clip;}
+*, *::before, *::after {box-sizing:border-box;}
+#overview, #explorer, #quality,
+#overview *, #explorer *, #quality * {min-width:0;}
+#overview, #explorer, #quality {max-width:100%; overflow-x:clip;}
+#overview > *, #explorer > *, #quality > * {max-width:100%;}
+#overview .js-plotly-plot, #explorer .js-plotly-plot,
+#quality .js-plotly-plot {
+  display:block; width:100%!important; max-width:100%!important;
+  min-width:0!important; position:relative; margin-top:32px;
+}
+#overview .plot-container, #explorer .plot-container,
+#quality .plot-container {max-width:100%; min-width:0;}
+#overview .modebar-container, #explorer .modebar-container,
+#quality .modebar-container {top:-30px!important; right:0!important;}
+@media (max-width:900px) {
+  #overview, #explorer, #quality {width:100%; min-width:0;}
+  #overview .js-plotly-plot, #explorer .js-plotly-plot,
+  #quality .js-plotly-plot {margin-top:36px;}
+  #overview .modebar-container, #explorer .modebar-container,
+  #quality .modebar-container {top:-34px!important;}
+}
+</style>
+<script id="ncd-responsive-resizer">
+(function () {
+  'use strict';
+  let queued=false;
+  function resize() {
+    queued=false;
+    if (!window.Plotly || !window.Plotly.relayout) return;
+    document.querySelectorAll('#overview .js-plotly-plot, #explorer .js-plotly-plot, #quality .js-plotly-plot').forEach(function(plot) {
+      if (!plot.offsetParent || !plot._fullLayout) return;
+      const parent=plot.parentElement;
+      if (!parent) return;
+      const rect=parent.getBoundingClientRect();
+      const width=Math.floor(Math.min(rect.width, document.documentElement.clientWidth - Math.max(rect.left,0) - 8));
+      if (!Number.isFinite(width) || width < 230) return;
+      const current=plot._fullLayout.width;
+      if (Math.abs(current-width) > 2) {
+        window.Plotly.relayout(plot, {width:width}).catch(function(e){console.warn('NCD resize:',e);});
+      }
+    });
+  }
+  function schedule() {
+    if (queued) return;
+    queued=true;
+    requestAnimationFrame(function(){requestAnimationFrame(resize);});
+  }
+  document.addEventListener('DOMContentLoaded',function() {
+    window.addEventListener('resize',schedule,{passive:true});
+    document.querySelectorAll('[id^="tab-"]').forEach(function(tab){
+      tab.addEventListener('click',function(){setTimeout(schedule,120);setTimeout(schedule,500);});
+    });
+    const ro=window.ResizeObserver ? new ResizeObserver(schedule) : null;
+    if(ro) ['overview','explorer','quality'].forEach(function(id){
+      const node=document.getElementById(id);if(node)ro.observe(node);
+    });
+    setTimeout(schedule,300);setTimeout(schedule,1500);
+  });
+})();
+</script>
+</head><body>
 <header><h1>Thailand NCDs Intelligence</h1><div class="sub">World Bank WDI · SH.DYN.NCOM.ZS · ASEAN-11 · 2000–2021 · 242 verified observations · Standalone offline dashboard</div></header>
 <main class="wrap"><div class="controls"><div><label for="year">Selected year</label><select id="year"></select></div><div><label for="country">Focus country</label><select id="country"></select></div><div><label for="lang">Interface language</label><select id="lang"><option value="en">English</option><option value="th">ไทย</option></select></div><button id="reset">Reset filters</button></div>
 <div class="tabs" role="tablist" aria-label="Dashboard pages"><button role="tab" id="tab-overview" aria-controls="overview" aria-selected="true">1. Executive overview</button><button role="tab" id="tab-explorer" aria-controls="explorer" aria-selected="false">2. ASEAN explorer</button><button role="tab" id="tab-quality" aria-controls="quality" aria-selected="false">3. Data quality</button></div>

@@ -1,11 +1,8 @@
 name: NCD responsive fix verification
 on:
-  push:
-    branches:
-      - fix/ncd-mobile-responsive-20261120
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
   actions: read
 jobs:
   responsive:
@@ -25,7 +22,10 @@ jobs:
           python -m pip install playwright
           python -m playwright install --with-deps chromium
       - name: Patch original HTML without changing main
-        run: python qa/apply_responsive_fix.py
+        run: |
+          if ! grep -q 'ncd-responsive-fix-v1' index.html; then
+            python qa/apply_responsive_fix.py
+          fi
       - name: Retrieve baseline evidence from run 44647887881
         env:
           GH_TOKEN: ${{ github.token }}
@@ -83,13 +83,6 @@ jobs:
             mobile-evidence/
             baseline/evidence.json
           if-no-files-found: warn
-      - name: Commit source fix on branch only if tests pass
-        if: steps.verification.outcome == 'success'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html
-          git diff --cached --quiet || (git commit -m "Fix Plotly and Explorer responsive layout [QA only]" && git push origin HEAD:fix/ncd-mobile-responsive-20261120)
       - name: Enforce verification gate
         if: steps.verification.outcome != 'success'
         run: |

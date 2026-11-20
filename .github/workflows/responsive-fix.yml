@@ -1,0 +1,97 @@
+name: NCD responsive fix verification
+on:
+  push:
+    branches:
+      - fix/ncd-mobile-responsive-20261120
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  responsive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout isolated fix branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Use Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install free test dependencies
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Patch original HTML without changing main
+        run: python qa/apply_responsive_fix.py
+      - name: Retrieve baseline evidence from run 44647887881
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p baseline
+          gh api repos/${{ github.repository }}/actions/artifacts/14589333171/zip > baseline/previous.zip
+          python - <<'PY'
+          import zipfile, pathlib
+          with zipfile.ZipFile('baseline/previous.zip') as z:
+              z.extractall('baseline')
+              print('Baseline evidence:', z.namelist())
+          PY
+      - name: Serve only local candidate (no deployment)
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 > /tmp/ncd-http.log 2>&1 &
+          echo $! > /tmp/ncd-http.pid
+      - name: Test both viewports and generate all six images
+        id: verification
+        continue-on-error: true
+        run: python qa/verify_responsive.py
+      - name: Compare before/after measured overflow
+        if: always()
+        run: |
+          python - <<'PY'
+          import json,pathlib
+          before=list(pathlib.Path('baseline').rglob('evidence.json'))
+          after=pathlib.Path('mobile-evidence/evidence.json')
+          result={'baseline_run':44647887881,'baseline_artifact_id':14589333171,'rows':[]}
+          if before and after.exists():
+              b=json.loads(before[0].read_text())
+              a=json.loads(after.read_text())
+              for new in a.get('runs',[]):
+                  old=next((x for x in b.get('runs',[]) if x.get('requested',x.get('viewport'))==new['viewport']),{})
+                  for panel in new.get('panels',[]):
+                      oldpanel=next((p for p in old.get('panels',[]) if p.get('name')==panel['name']),{})
+                      result['rows'].append({
+                          'viewport':new['viewport'],'panel':panel['name'],
+                          'before_document_overflow_px':oldpanel.get('document',{}).get('overflow'),
+                          'after_document_overflow_px':panel['document']['overflow'],
+                          'before_panel_overflow_px':oldpanel.get('panel',{}).get('overflow'),
+                          'after_panel_overflow_px':panel['panel']['overflow'],
+                          'before_max_chart_overflow_px':max([c.get('overflow',0) for c in oldpanel.get('charts',[])],default=None),
+                          'after_max_chart_overflow_px':max([c['overflow'] for c in panel['charts']],default=None)
+                      })
+          pathlib.Path('mobile-evidence').mkdir(exist_ok=True)
+          pathlib.Path('mobile-evidence/comparison.json').write_text(json.dumps(result,indent=2))
+          print(json.dumps(result,indent=2))
+          PY
+      - name: Upload screenshots and metrics regardless of pass/fail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ncd-responsive-before-after
+          path: |
+            mobile-evidence/
+            baseline/evidence.json
+          if-no-files-found: warn
+      - name: Commit source fix on branch only if tests pass
+        if: steps.verification.outcome == 'success'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || (git commit -m "Fix Plotly and Explorer responsive layout [QA only]" && git push origin HEAD:fix/ncd-mobile-responsive-20261120)
+      - name: Enforce verification gate
+        if: steps.verification.outcome != 'success'
+        run: |
+          echo 'Candidate failed measured responsive acceptance; index.html not committed.'
+          exit 1

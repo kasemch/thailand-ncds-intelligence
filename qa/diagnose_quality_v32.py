@@ -4,6 +4,7 @@ from playwright.sync_api import sync_playwright
 from subprocess import run
 p=Path("qa-v32-diagnostic");p.mkdir(exist_ok=True)
 results=[]
+# v3.2 diagnosis after Quality semantic table wrapping
 with sync_playwright() as pw:
  browser=pw.chromium.launch()
  for width in (195,320):

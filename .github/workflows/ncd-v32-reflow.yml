@@ -1,0 +1,119 @@
+name: NCD v3.2 isolated reflow remediation qualification
+on:
+  push:
+    branches: [fix/ncd-mobile-responsive-20261120]
+    paths:
+      - 'qa/apply_reflow_fix_v32.py'
+      - 'qa/verify_reflow_v32.py'
+      - '.github/workflows/ncd-v32-reflow.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install free Playwright engines and axe-core
+        run: |
+          python -m pip install 'playwright==1.58.0'
+          python -m playwright install --with-deps chromium webkit
+          npm install --no-save --ignore-scripts --no-audit --no-fund axe-core@4.10.3
+      - name: Start local-only source server (never deploy)
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/ncd-v32-server.log 2>&1 &
+          sleep 2
+          curl --fail --silent http://127.0.0.1:8765/ >/dev/null
+      - name: Capture original candidate before patch
+        id: before
+        continue-on-error: true
+        run: python qa/verify_reflow_v32.py --phase before
+      - name: Apply local v3.2 patch
+        run: python qa/apply_reflow_fix_v32.py
+      - name: Capture repaired candidate and WCAG regression
+        id: after
+        continue-on-error: true
+        run: python qa/verify_reflow_v32.py --phase after
+      - name: Calculate before-after and release-gate result
+        id: qualify
+        if: always()
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('qa-v32-evidence')
+          before=json.loads((root/'before.json').read_text())
+          after=json.loads((root/'after.json').read_text())
+          rows=[]
+          blockers=[]
+          baseline={(x['engine'],x['width']):x for x in before['browser_cases']}
+          for case in after['browser_cases']:
+            engine,width=case['engine'],case['width']
+            old=baseline[(engine,width)]
+            if case['status']!='RECORDED':blockers.append(f'{engine}/{width}: {case.get("error")}')
+            for p in case['panels']:
+              prev=next(x for x in old['panels'] if x['name']==p['name'])
+              row={'engine':engine,'width':width,'panel':p['name'],
+                'before_document':prev['document']['overflow'],
+                'after_document':p['document']['overflow'],
+                'before_panel':prev['panel']['overflow'],
+                'after_panel':p['panel']['overflow'],
+                'scroll_regions':p['regions'],
+                'plot_overflow':[{'id':x['id'],'overflow':x['overflow'],'region':x['region'],
+                    'modebar_title_collisions':x['modebarTitleCollisions']} for x in p['plots']],
+                'axe_violations':p['axe']['violations'],
+                'axe_incomplete':p['axe']['incomplete']}
+              rows.append(row)
+              if p['document']['overflow']>0 or p['panel']['overflow']>2:
+                blockers.append(f'{engine}/{width}/{p["name"]}: page/panel overflow {p["document"]["overflow"]}/{p["panel"]["overflow"]}')
+              if p['axe']['violations']:
+                blockers.append(f'{engine}/{width}/{p["name"]}: axe violations')
+              if any(x['modebarTitleCollisions'] for x in p['plots']):
+                blockers.append(f'{engine}/{width}/{p["name"]}: modebar/title collision')
+              if width==195 and p['name'] in ('explorer','quality'):
+                if not p['regions'] or not all(x['tabIndex']>=0 and x['label'] and x['scrollable'] for x in p['regions']):
+                  blockers.append(f'{engine}/{width}/{p["name"]}: no accessible internal scroll')
+                if p.get('focusRegion') is not True:
+                  blockers.append(f'{engine}/{width}/{p["name"]}: scroll region not keyboard focusable')
+          if any(x['status']!='RECORDED' for x in before['browser_cases']):blockers.append('before capture errors')
+          if len(rows)!=24:blockers.append(f'expected 24 panel cases; got {len(rows)}')
+          report={'version':'3.2','acceptance':'AUTOMATED_GO' if not blockers else 'HOLD',
+             'production':'HOLD','native_ipad_safari':'NOT CERTIFIED',
+             'policy':'internal horizontal scroll for genuinely 2D chart/table is allowed; no page or panel overflow',
+             'blockers':blockers,'rows':rows}
+          (root/'comparison.json').write_text(json.dumps(report,indent=2,ensure_ascii=False))
+          print(json.dumps({'acceptance':report['acceptance'],'blockers':blockers,
+            'rows':[{'engine':x['engine'],'width':x['width'],'panel':x['panel'],
+               'before':x['before_panel'],'after':x['after_panel']} for x in rows]},indent=2))
+          raise SystemExit(0 if not blockers else 1)
+          PY
+      - name: Upload all raw measurements and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ncd-v32-before-after-and-accessibility
+          path: qa-v32-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Commit repaired HTML only to isolated fix branch after acceptance
+        if: steps.before.outcome == 'success' && steps.after.outcome == 'success' && steps.qualify.outcome == 'success'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Remediate 195px chart and table reflow with keyboard scroll [HOLD]"
+            git push origin HEAD:fix/ncd-mobile-responsive-20261120
+          fi
+      - name: Production remains blocked if any QA requirement failed
+        if: steps.before.outcome != 'success' || steps.after.outcome != 'success' || steps.qualify.outcome != 'success'
+        run: |
+          echo "HOLD: See raw before/after evidence, no HTML commit if failed."
+          exit 1

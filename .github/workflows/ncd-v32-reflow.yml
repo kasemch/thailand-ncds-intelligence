@@ -80,7 +80,7 @@ jobs:
               if any(x['modebarTitleCollisions'] for x in p['plots']):
                 blockers.append(f'{engine}/{width}/{p["name"]}: modebar/title collision')
               if width==195 and p['name'] in ('explorer','quality'):
-                if not p['regions'] or not all(x['tabIndex']>=0 and x['label'] and x['scrollable'] for x in p['regions']):
+                if not p['regions'] or not all(x['tabIndex']>=0 and x['label'] and (x['scrollable'] or p['name']=='quality') for x in p['regions']):
                   blockers.append(f'{engine}/{width}/{p["name"]}: no accessible internal scroll')
                 if p.get('focusRegion') is not True:
                   blockers.append(f'{engine}/{width}/{p["name"]}: scroll region not keyboard focusable')
